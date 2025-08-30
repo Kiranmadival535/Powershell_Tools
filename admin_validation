@@ -1,0 +1,461 @@
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+# =========================
+# CONFIG
+# =========================
+$reportsFolder = "C:\Users\kiran\OneDrive\Desktop\admin validation\reports"
+
+# =========================
+# FORM
+# =========================
+$form = New-Object System.Windows.Forms.Form
+$form.Text = "Monthly Audit Comparison"
+$form.Size = New-Object System.Drawing.Size(1000, 550)
+$form.StartPosition = "CenterScreen"
+$form.BackColor = [System.Drawing.Color]::LightSlateGray
+$form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedSingle
+
+# =========================
+# MENU STRIP (as earlier)
+# =========================
+$menuStrip = New-Object System.Windows.Forms.MenuStrip
+$menuStrip.BackColor = [System.Drawing.SystemColors]::InactiveCaption
+$menuStrip.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+
+# File
+$fileMenu  = New-Object System.Windows.Forms.ToolStripMenuItem "File"
+$fileNew   = New-Object System.Windows.Forms.ToolStripMenuItem "New (Clear Grid)"
+$fileSave  = New-Object System.Windows.Forms.ToolStripMenuItem "Save (CSV)"
+$fileXlsx  = New-Object System.Windows.Forms.ToolStripMenuItem "Export to Excel"
+$fileExit  = New-Object System.Windows.Forms.ToolStripMenuItem "Exit"
+$fileMenu.DropDownItems.AddRange(@($fileNew, $fileSave, $fileXlsx, (New-Object System.Windows.Forms.ToolStripSeparator), $fileExit))
+
+# Edit (placeholder)
+$editMenu = New-Object System.Windows.Forms.ToolStripMenuItem "Edit"
+
+# Toolbox
+$toolBoxMenu = New-Object System.Windows.Forms.ToolStripMenuItem "Toolbox"
+$toolCompare = New-Object System.Windows.Forms.ToolStripMenuItem "Compare Users"
+$toolExport  = New-Object System.Windows.Forms.ToolStripMenuItem "Export Grid to CSV"
+$toolBoxMenu.DropDownItems.AddRange(@($toolCompare, $toolExport))
+
+# Help
+$helpMenu = New-Object System.Windows.Forms.ToolStripMenuItem "Help"
+$helpAbout = New-Object System.Windows.Forms.ToolStripMenuItem "About"
+$helpAbout.Add_Click({
+    [System.Windows.Forms.MessageBox]::Show(
+        "Kiran made this application to compare monthly audit CSVs and show Added/Removed/Unchanged users.",
+        "About",
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        [System.Windows.Forms.MessageBoxIcon]::Information
+    )
+})
+$helpMenu.DropDownItems.Add($helpAbout)
+
+$menuStrip.Items.AddRange(@($fileMenu, $editMenu, $toolBoxMenu, $helpMenu))
+$form.MainMenuStrip = $menuStrip
+$form.Controls.Add($menuStrip)
+
+# =========================
+# TOOL STRIP (as earlier)
+# =========================
+$toolStrip = New-Object System.Windows.Forms.ToolStrip
+$toolStrip.BackColor = [System.Drawing.SystemColors]::ActiveCaption
+
+$tsSave = New-Object System.Windows.Forms.ToolStripButton
+$tsSave.Text = "Save"
+$tsSave.ToolTipText = "Save DataGridView to CSV"
+
+$tsSep  = New-Object System.Windows.Forms.ToolStripSeparator
+
+$tsPrint = New-Object System.Windows.Forms.ToolStripButton
+$tsPrint.Text = "Print"
+$tsPrint.ToolTipText = "Print DataGridView"
+
+$toolStrip.Items.AddRange(@($tsSave, $tsSep, $tsPrint))
+$form.Controls.Add($toolStrip)
+
+# =========================
+# INPUT CONTROLS
+# =========================
+# Application
+$lblApp = New-Object System.Windows.Forms.Label
+$lblApp.Text = "Application:"
+$lblApp.Location = New-Object System.Drawing.Point(20, 60)
+$lblApp.Size = New-Object System.Drawing.Size(80, 22)
+$form.Controls.Add($lblApp)
+
+$cbApp = New-Object System.Windows.Forms.ComboBox
+$cbApp.Location = New-Object System.Drawing.Point(100, 58)
+$cbApp.Width = 80
+$cbApp.DropDownStyle = "DropDownList"
+$cbApp.Items.AddRange(@("All","Database","Oracle","Active Directory"))
+$cbApp.SelectedIndex = 0
+$form.Controls.Add($cbApp)
+
+# Old Month
+$lblOld = New-Object System.Windows.Forms.Label
+$lblOld.Text = "Old Month:"
+$lblOld.Location = New-Object System.Drawing.Point(20, 95)
+$lblOld.Size = New-Object System.Drawing.Size(80, 22)
+$form.Controls.Add($lblOld)
+
+$months = @("January","February","March","April","May","June","July","August","September","October","November","December")
+
+$cbOld = New-Object System.Windows.Forms.ComboBox
+$cbOld.Location = New-Object System.Drawing.Point(100, 93)
+$cbOld.Width = 80
+$cbOld.DropDownStyle = "DropDownList"
+$cbOld.Items.AddRange($months)
+$cbOld.SelectedIndex = 6  # July
+$form.Controls.Add($cbOld)
+
+# New Month
+$lblNew = New-Object System.Windows.Forms.Label
+$lblNew.Text = "New Month:"
+$lblNew.Location = New-Object System.Drawing.Point(20, 130)
+$lblNew.Size = New-Object System.Drawing.Size(80, 22)
+$form.Controls.Add($lblNew)
+
+$cbNew = New-Object System.Windows.Forms.ComboBox
+$cbNew.Location = New-Object System.Drawing.Point(100, 128)
+$cbNew.Width = 80
+$cbNew.DropDownStyle = "DropDownList"
+$cbNew.Items.AddRange($months)
+$cbNew.SelectedIndex = 7  # August
+$form.Controls.Add($cbNew)
+
+# Filter
+$lblFilter = New-Object System.Windows.Forms.Label
+$lblFilter.Text = "Show:"
+$lblFilter.Location = New-Object System.Drawing.Point(20, 165)
+$lblFilter.Size = New-Object System.Drawing.Size(80, 22)
+$form.Controls.Add($lblFilter)
+
+$cbFilter = New-Object System.Windows.Forms.ComboBox
+$cbFilter.Location = New-Object System.Drawing.Point(100, 163)
+$cbFilter.Width = 80
+$cbFilter.DropDownStyle = "DropDownList"
+$cbFilter.Items.AddRange(@("All","Modified Only","Unchanged Only"))
+$cbFilter.SelectedIndex = 0
+$form.Controls.Add($cbFilter)
+
+# =========================
+# BUTTONS (left column)
+# =========================
+$btnCompare = New-Object System.Windows.Forms.Button
+$btnCompare.Text = "COMPARE"
+$btnCompare.Location = New-Object System.Drawing.Point(20, 205)
+$btnCompare.Size = New-Object System.Drawing.Size(160, 30)
+$btnCompare.BackColor = [System.Drawing.SystemColors]::ActiveCaption
+$form.Controls.Add($btnCompare)
+
+$btnClear = New-Object System.Windows.Forms.Button
+$btnClear.Text = "CLEAR"
+$btnClear.Location = New-Object System.Drawing.Point(20, 245)
+$btnClear.Size = New-Object System.Drawing.Size(160, 30)
+$btnClear.BackColor = [System.Drawing.SystemColors]::ButtonFace
+$form.Controls.Add($btnClear)
+
+$btnExit = New-Object System.Windows.Forms.Button
+$btnExit.Text = "EXIT"
+$btnExit.Location = New-Object System.Drawing.Point(20, 285)
+$btnExit.Size = New-Object System.Drawing.Size(160, 30)
+$btnExit.BackColor = [System.Drawing.Color]::LightCoral
+$form.Controls.Add($btnExit)
+
+# =========================
+# DATAGRIDVIEW (as earlier style)
+# =========================
+$dataGridView = New-Object System.Windows.Forms.DataGridView
+$dataGridView.Size = New-Object System.Drawing.Size(760, 350)
+$dataGridView.Location = New-Object System.Drawing.Point(200, 60)
+$dataGridView.Anchor = "Top","Bottom","Left","Right"
+$dataGridView.BackgroundColor = [System.Drawing.SystemColors]::InactiveCaption
+$dataGridView.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+$dataGridView.RowHeadersVisible = $false
+$dataGridView.EnableHeadersVisualStyles = $false
+$dataGridView.ColumnHeadersDefaultCellStyle.BackColor = [System.Drawing.Color]::BurlyWood
+$dataGridView.ColumnHeadersDefaultCellStyle.Alignment = "MiddleCenter"
+$dataGridView.ColumnHeadersHeight = 25
+$dataGridView.DefaultCellStyle.Alignment = "MiddleCenter"
+$dataGridView.AllowUserToAddRows = $false
+$dataGridView.ReadOnly = $true
+
+# Columns (Status last)
+$colApp = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
+$colApp.HeaderText = "Application"
+$colApp.Name = "Application"
+$colApp.AutoSizeMode = "Fill"
+$dataGridView.Columns.Add($colApp)
+
+$colUser = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
+$colUser.HeaderText = "Username"
+$colUser.Name = "Username"
+$colUser.AutoSizeMode = "Fill"
+$dataGridView.Columns.Add($colUser)
+
+$colStatus = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
+$colStatus.HeaderText = "Status"
+$colStatus.Name = "Status"
+$colStatus.AutoSizeMode = "Fill"
+$dataGridView.Columns.Add($colStatus)
+
+$form.Controls.Add($dataGridView)
+
+# =========================
+# STATUS STRIP (progress)
+# =========================
+$statusStrip = New-Object System.Windows.Forms.StatusStrip
+$toolStripProgressBar = New-Object System.Windows.Forms.ToolStripProgressBar
+$toolStripProgressBar.Size = New-Object System.Drawing.Size(150, 16)
+$toolStripProgressBar.Minimum = 0
+$toolStripProgressBar.Maximum = 100
+$toolStripProgressBar.Value = 0
+$statusStrip.Items.Add($toolStripProgressBar)
+$form.Controls.Add($statusStrip)
+
+# =========================
+# WATERMARK
+# =========================
+$watermarkLabel = New-Object System.Windows.Forms.Label
+$watermarkLabel.Text = "Created by : Kiran Madival"
+$watermarkLabel.AutoSize = $true
+$watermarkLabel.Font = New-Object System.Drawing.Font("Arial", 8, [System.Drawing.FontStyle]::Bold)
+$watermarkLabel.BackColor = [System.Drawing.Color]::White
+$watermarkLabel.Location = New-Object System.Drawing.Point(820, 492)
+$watermarkLabel.Anchor = "Bottom","Right"
+$form.Controls.Add($watermarkLabel)
+
+# =========================
+# HELPERS & FUNCTIONS
+# =========================
+$script:lastResults = @()
+
+function Find-ReportFile {
+    param(
+        [string]$App,
+        [string]$Month
+    )
+    # flexible match: *app*month*.csv (case-insensitive)
+    Get-ChildItem -Path $reportsFolder -Recurse -File -ErrorAction SilentlyContinue `
+        -Include "*$App*${Month}*.csv" | Select-Object -First 1
+}
+
+function Compare-Reports {
+    $dataGridView.Rows.Clear()
+    $script:lastResults = @()
+    $toolStripProgressBar.Value = 0
+
+    $selectedApp = $cbApp.SelectedItem
+    $oldMonth    = $cbOld.SelectedItem
+    $newMonth    = $cbNew.SelectedItem
+
+    if (-not $oldMonth -or -not $newMonth) {
+        [System.Windows.Forms.MessageBox]::Show("Please select both Old and New months.")
+        return
+    }
+
+    $apps = if ($selectedApp -eq "All") { @("Database","Oracle","Active Directory") } else { @($selectedApp) }
+    $count = $apps.Count
+    $i = 0
+
+    foreach ($app in $apps) {
+        $i++
+        $pct = [math]::Floor(($i / $count) * 100)
+        $toolStripProgressBar.Value = [Math]::Min($pct, 100)
+
+        $oldFile = Find-ReportFile -App $app -Month $oldMonth
+        $newFile = Find-ReportFile -App $app -Month $newMonth
+
+        if (-not $oldFile -or -not $newFile) {
+            $script:lastResults += [PSCustomObject]@{ Application=$app; Username="N/A"; Status="Report Missing" }
+            continue
+        }
+
+        $oldData = Import-Csv $oldFile.FullName
+        $newData = Import-Csv $newFile.FullName
+
+        # Handle missing columns gracefully
+        $oldUsers = @()
+        $newUsers = @()
+        if ($oldData -and ($oldData | Get-Member -Name Username -MemberType NoteProperty)) {
+            $oldUsers = $oldData.Username | Where-Object { $_ } | ForEach-Object { $_.Trim() } | Sort-Object -Unique
+        }
+        if ($newData -and ($newData | Get-Member -Name Username -MemberType NoteProperty)) {
+            $newUsers = $newData.Username | Where-Object { $_ } | ForEach-Object { $_.Trim() } | Sort-Object -Unique
+        }
+
+        # Compare
+        $added   = $newUsers | Where-Object { $_ -notin $oldUsers }
+        $removed = $oldUsers | Where-Object { $_ -notin $newUsers }
+        $unchanged = $newUsers | Where-Object { $_ -in $oldUsers }
+
+        foreach ($u in $added)    { $script:lastResults += [PSCustomObject]@{ Application=$app; Username=$u; Status="Added" } }
+        foreach ($u in $removed)  { $script:lastResults += [PSCustomObject]@{ Application=$app; Username=$u; Status="Removed" } }
+        foreach ($u in $unchanged){ $script:lastResults += [PSCustomObject]@{ Application=$app; Username=$u; Status="Unchanged" } }
+    }
+
+    Render-Results
+}
+
+function Apply-Filter([System.Collections.IEnumerable]$items) {
+    switch ($cbFilter.SelectedItem) {
+        "Modified Only"  { return $items | Where-Object { $_.Status -ne "Unchanged" } }
+        "Unchanged Only" { return $items | Where-Object { $_.Status -eq "Unchanged" } }
+        default          { return $items }
+    }
+}
+
+function Render-Results {
+    $dataGridView.Rows.Clear()
+    $filtered = Apply-Filter $script:lastResults
+
+    foreach ($r in $filtered) {
+        $row = $dataGridView.Rows[$dataGridView.Rows.Add()]
+        $row.Cells["Application"].Value = $r.Application
+        $row.Cells["Username"].Value    = $r.Username
+        $row.Cells["Status"].Value      = $r.Status
+
+        switch ($r.Status) {
+            "Added"           { $row.Cells["Status"].Style.BackColor = [System.Drawing.Color]::LightGreen }
+            "Removed"         { $row.Cells["Status"].Style.BackColor = [System.Drawing.Color]::LightCoral }
+            "Unchanged"       { $row.Cells["Status"].Style.BackColor = [System.Drawing.Color]::Gainsboro }
+            "Report Missing"  { $row.Cells["Status"].Style.BackColor = [System.Drawing.Color]::Khaki }
+        }
+    }
+}
+
+function Export-Grid-ToCsv {
+    $saveDlg = New-Object System.Windows.Forms.SaveFileDialog
+    $saveDlg.Filter = "CSV files (*.csv)|*.csv"
+    $saveDlg.FileName = "CompareOutput.csv"
+    if ($saveDlg.ShowDialog() -ne "OK") { return }
+
+    $rows = foreach ($row in $dataGridView.Rows) {
+        if ($row.Cells["Application"].Value -or $row.Cells["Username"].Value -or $row.Cells["Status"].Value) {
+            [PSCustomObject]@{
+                Application = $row.Cells["Application"].Value
+                Username    = $row.Cells["Username"].Value
+                Status      = $row.Cells["Status"].Value
+            }
+        }
+    }
+    $rows | Export-Csv -Path $saveDlg.FileName -NoTypeInformation -Force
+    [System.Windows.Forms.MessageBox]::Show("Data saved to $($saveDlg.FileName)","Export")
+}
+
+function Export-Grid-ToExcel {
+    try {
+        $excel = New-Object -ComObject Excel.Application
+        $excel.Visible = $false
+        $wb = $excel.Workbooks.Add()
+        $ws = $wb.Worksheets.Item(1)
+
+        $ws.Cells.Item(1,1) = "Application"
+        $ws.Cells.Item(1,2) = "Username"
+        $ws.Cells.Item(1,3) = "Status"
+
+        $r = 2
+        foreach ($row in $dataGridView.Rows) {
+            if ($row.Cells["Application"].Value -or $row.Cells["Username"].Value -or $row.Cells["Status"].Value) {
+                $ws.Cells.Item($r,1) = $row.Cells["Application"].Value
+                $ws.Cells.Item($r,2) = $row.Cells["Username"].Value
+                $ws.Cells.Item($r,3) = $row.Cells["Status"].Value
+                $r++
+            }
+        }
+
+        $ws.UsedRange.EntireColumn.AutoFit() | Out-Null
+
+        $saveDlg = New-Object System.Windows.Forms.SaveFileDialog
+        $saveDlg.Filter = "Excel Workbook (*.xlsx)|*.xlsx"
+        $saveDlg.FileName = "CompareOutput.xlsx"
+        if ($saveDlg.ShowDialog() -eq "OK") {
+            $wb.SaveAs($saveDlg.FileName)
+        }
+        $wb.Close($true)
+        $excel.Quit()
+        [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
+        [System.Windows.Forms.MessageBox]::Show("Excel export completed.")
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show("Excel export failed: $_")
+    }
+}
+
+function Print-Grid {
+    try {
+        $printDialog = New-Object System.Windows.Forms.PrintDialog
+        if ($printDialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return }
+
+        $printDocument = New-Object System.Drawing.Printing.PrintDocument
+        $printDocument.PrinterSettings = $printDialog.PrinterSettings
+        $printDocument.add_PrintPage({
+            param($sender, $e)
+            $font  = New-Object System.Drawing.Font("Arial", 10)
+            $brush = [System.Drawing.Brushes]::Black
+            $pen   = New-Object System.Drawing.Pen([System.Drawing.Color]::Black)
+
+            $x = 50; $y = 50
+            $cellWidth  = 180
+            $cellHeight = 25
+
+            # Watermark
+            $wmText = "Made By Kiran Madival"
+            $wmFont = New-Object System.Drawing.Font("Arial", 20)
+            $wmBrush= New-Object System.Drawing.SolidBrush([System.Drawing.Color]::LightGray)
+            $sz = $e.Graphics.MeasureString($wmText, $wmFont)
+            $e.Graphics.DrawString($wmText, $wmFont, $wmBrush, ($e.PageBounds.Width-$sz.Width)/2, ($e.PageBounds.Height-$sz.Height)/2)
+
+            # Headers
+            for ($col=0; $col -lt $dataGridView.ColumnCount; $col++) {
+                $e.Graphics.DrawRectangle($pen, $x, $y, $cellWidth, $cellHeight)
+                $e.Graphics.DrawString($dataGridView.Columns[$col].HeaderText, $font, $brush, $x+5, $y+5)
+                $x += $cellWidth
+            }
+            $x = 50; $y += $cellHeight
+
+            # Rows
+            for ($row=0; $row -lt $dataGridView.Rows.Count; $row++) {
+                for ($col=0; $col -lt $dataGridView.Columns.Count; $col++) {
+                    $val = $dataGridView.Rows[$row].Cells[$col].Value
+                    $e.Graphics.DrawRectangle($pen, $x, $y, $cellWidth, $cellHeight)
+                    if ($val) { $e.Graphics.DrawString($val.ToString(), $font, $brush, $x+5, $y+5) }
+                    $x += $cellWidth
+                }
+                $x = 50; $y += $cellHeight
+            }
+        })
+        $printDocument.Print()
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show("An error occurred while printing: $_")
+    }
+}
+
+# =========================
+# EVENTS
+# =========================
+$btnCompare.Add_Click({ Compare-Reports })
+$btnClear.Add_Click({ $dataGridView.Rows.Clear(); $script:lastResults = @(); $toolStripProgressBar.Value = 0 })
+$btnExit.Add_Click({ $form.Close() })
+
+$fileNew.Add_Click({ $dataGridView.Rows.Clear(); $script:lastResults = @(); $toolStripProgressBar.Value = 0 })
+$fileSave.Add_Click({ Export-Grid-ToCsv })
+$fileXlsx.Add_Click({ Export-Grid-ToExcel })
+$fileExit.Add_Click({ $form.Close() })
+
+$toolCompare.Add_Click({ Compare-Reports })
+$toolExport.Add_Click({ Export-Grid-ToCsv })
+
+$tsSave.Add_Click({ Export-Grid-ToCsv })
+$tsPrint.Add_Click({ Print-Grid })
+
+# Live re-filter when selection changes
+$cbFilter.Add_SelectedIndexChanged({ if ($script:lastResults.Count -gt 0) { Render-Results } })
+
+# =========================
+# SHOW
+# =========================
+$form.Add_Shown({ $form.Activate() })
+[void]$form.ShowDialog()
